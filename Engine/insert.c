@@ -398,6 +398,8 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
     INSDS     *ip, **ipp, *prvp, *nxtp;
     OPARMS    *O = csound->oparms;
     CS_VAR_MEM *pfields;
+    EVTBLK  *evt;
+    int pmax = 0;
 
     if (UNLIKELY(csound->advanceCnt))
       return 0;
@@ -509,6 +511,7 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
         CS_VAR_MEM* pfield = (pfields + i + 3);
         pfield->value = *(pdat + i);
       }
+      pmax = tp->pmax;
     }
 
 
@@ -524,6 +527,7 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
         csound->Message(csound, "  midiKey:         pfield: %3d  value: %3d\n",
                         pfield_index, (int) pfield->value);
       }
+      if(pmax < pfield_index) pmax = pfield_index;
     }
     else if (O->midiKeyCps) {
       int pfield_index = O->midiKeyCps;
@@ -538,6 +542,7 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
         csound->Message(csound, "  midiKeyCps:      pfield: %3d  value: %3d\n",
                         pfield_index, (int) pfield->value);
       }
+      if(pmax < pfield_index) pmax = pfield_index;
     }
     else if (O->midiKeyOct) {
       int pfield_index = O->midiKeyOct;
@@ -549,6 +554,7 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
         csound->Message(csound, "  midiKeyOct:      pfield: %3d  value: %3d\n",
                         pfield_index, (int) pfield->value);
       }
+      if(pmax < pfield_index) pmax = pfield_index;
     }
     else if (O->midiKeyPch) {
       int pfield_index = O->midiKeyPch;
@@ -565,6 +571,7 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
         csound->Message(csound, "  midiKeyPch:      pfield: %3d  value: %3d\n",
                         pfield_index, (int) pfield->value);
       }
+      if(pmax < pfield_index) pmax = pfield_index;
     }
     if (O->midiVelocity) {
       int pfield_index = O->midiVelocity;
@@ -575,6 +582,7 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
         csound->Message(csound, "  midiVelocity:    pfield: %3d  value: %3d\n",
                         pfield_index, (int) pfield->value);
       }
+      if(pmax < pfield_index) pmax = pfield_index;
     }
     else if (O->midiVelocityAmp) {
       int pfield_index = O->midiVelocityAmp;
@@ -586,6 +594,19 @@ int MIDIinsert(CSOUND *csound, int insno, MCHNBLK *chn, MEVENT *mep)
       if (UNLIKELY(O->msglevel & WARNMSG)) {
         csound->Message(csound, "  midiVelocityAmp: pfield: %3d  value: %3d\n",
                         pfield_index, (int)pfield->value);
+      }
+      if(pmax < pfield_index) pmax = pfield_index;
+    }
+    if(pmax > 0){
+      int i;
+      if(csound->currevent == NULL){
+       evt = (EVTBLK *) csound->Calloc(csound, sizeof(EVTBLK));
+       csound->currevent = evt;
+      }
+      else evt = csound->currevent;
+      evt->pcnt = pmax+1;
+      for(i =0; i < evt->pcnt; i++){
+        evt->p[i] = pfields[i].value;
       }
     }
 #ifdef HAVE_ATOMIC_BUILTIN
@@ -2113,7 +2134,7 @@ static void instance(CSOUND *csound, int insno)
     /* gbloffbas = csound->globalVarPool; */
     lcloffbas = (CS_VAR_MEM*)&ip->p0;
     lclbas = (MYFLT*) ((char*) ip + pextent);   /* split local space */
-    initializeVarPool(lclbas, tp->varPool);
+    initializeVarPool((void *)csound, lclbas, tp->varPool);
 
     opMemStart = nxtopds = (char*) lclbas + tp->varPool->poolSize +
                 (tp->varPool->varCount * sizeof(MYFLT));

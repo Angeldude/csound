@@ -85,7 +85,7 @@ static inline void tabensure(CSOUND *csound, ARRAYDAT *p, int size)
       p->dimensions = 1;
       p->sizes = (int*)csound->Malloc(csound, sizeof(int));
       p->sizes[0] = size;
-  }
+    }
 }
 
 static int array_init(CSOUND *csound, ARRAYINIT *p)
@@ -101,7 +101,7 @@ static int array_init(CSOUND *csound, ARRAYINIT *p)
                           Str("Error: no sizes set for array initialization"));
 
     for (i = 0; i < inArgCount; i++) {
-      if(MYFLT2LRND(*p->isizes[i]) <= 0) {
+      if (MYFLT2LRND(*p->isizes[i]) <= 0) {
         return
           csound->InitError(csound,
                           Str("Error: sizes must be > 0 for array initialization"));
@@ -123,17 +123,14 @@ static int array_init(CSOUND *csound, ARRAYINIT *p)
       size = MYFLT2LRND(size);
     }
 
-    CS_VARIABLE* var = arrayDat->arrayType->createVariable(csound, NULL);
-
+    CS_VARIABLE* var = arrayDat->arrayType->createVariable(csound,NULL);
     arrayDat->arrayMemberSize = var->memBlockSize;
     arrayDat->data = csound->Calloc(csound, var->memBlockSize*size);
-  //    for (i=0; i<size; i++) t->data[i] = val;
-  //    { // Need to recover space eventually
-  //        TABDEL *op = (TABDEL*) csound->Malloc(csound, sizeof(TABDEL));
-  //        op->h.insdshead = ((OPDS*) p)->insdshead;
-  //        op->tab = t;
-  //        csound->RegisterDeinitCallback(csound, op, tabdel);
-  //    }
+    char *mem = (char *) arrayDat->data; 
+    for(i=0; i < size; i++){
+      var->initializeVariableMemory(csound,var,mem+i*var->memBlockSize);
+    }
+
     return OK;
 }
 
@@ -183,11 +180,11 @@ static int array_set(CSOUND* csound, ARRAY_SET *p)
     end = indefArgCount - 1;
     index = MYFLT2LRND(*p->indexes[end]);
     if (UNLIKELY(index >= dat->sizes[end] || index<0)){
-        csound->Warning(csound,
-                               Str("Array index %d out of range (0,%d) "
-                                   "for dimension %d"),
-                               index, dat->sizes[end]-1, indefArgCount);
-        return NOTOK;
+      csound->Warning(csound,
+                      Str("Array index %d out of range (0,%d) "
+                          "for dimension %d"),
+                      index, dat->sizes[end]-1, indefArgCount);
+      return NOTOK;
 
     }
 
@@ -196,8 +193,8 @@ static int array_set(CSOUND* csound, ARRAY_SET *p)
         int ind = MYFLT2LRND(*p->indexes[i]);
         if (UNLIKELY(ind >= dat->sizes[i] || ind<0)){
           csound->Warning(csound,Str("Array index %d out of range (0,%d) "
-                                       "for dimension %d"), ind,
-                                   dat->sizes[i]-1, i+1);
+                                     "for dimension %d"), ind,
+                          dat->sizes[i]-1, i+1);
           return NOTOK;
         }
         index += ind * dat->sizes[i + 1];
@@ -228,29 +225,29 @@ static int array_get(CSOUND* csound, ARRAY_GET *p)
                         Str("Error: no indexes set for array get"));
     if (UNLIKELY(indefArgCount>dat->dimensions)){
        csound->Warning(csound,
-                               Str("Array dimension %d out of range "
-                                   "for dimensions %d"),
-                               indefArgCount, dat->dimensions);
+                       Str("Array dimension %d out of range "
+                           "for dimensions %d"),
+                       indefArgCount, dat->dimensions);
        return NOTOK;
     }
     end = indefArgCount - 1;
     index = MYFLT2LRND(*p->indexes[end]);
     if (UNLIKELY(index >= dat->sizes[end] || index<0)){
       csound->Warning(csound,
-                               Str("Array index %d out of range (0,%d) "
-                                   "for dimension %d"),
-                               index, dat->sizes[end]-1, end+1);
+                      Str("Array index %d out of range (0,%d) "
+                          "for dimension %d"),
+                      index, dat->sizes[end]-1, end+1);
       return NOTOK;
 
     }
     if (indefArgCount > 1) {
       for (i = end - 1; i >= 0; i--) {
         int ind = MYFLT2LRND(*p->indexes[i]);
-        if (UNLIKELY(ind >= dat->sizes[i] || ind<0)){
-        csound->Warning(csound,
-                                   Str("Array index %d out of range (0,%d) "
-                                       "for dimension %d"), ind,
-                                   dat->sizes[i]-1, i+1);
+        if (UNLIKELY(ind >= dat->sizes[i] || ind<0)) {
+          csound->Warning(csound,
+                          Str("Array index %d out of range (0,%d) "
+                              "for dimension %d"), ind,
+                          dat->sizes[i]-1, i+1);
 
           return NOTOK;
         }
@@ -333,7 +330,7 @@ static int tabiadd(CSOUND *csound, ARRAYDAT *ans, ARRAYDAT *l, MYFLT r, void *p)
 static int tabarithset1(CSOUND *csound, TABARITH1 *p)
 {
     ARRAYDAT *left = p->left;
-    if(p->ans->data == left->data) {
+    if (p->ans->data == left->data) {
       printf("same ptr \n");
       return OK;
     }
@@ -1064,6 +1061,27 @@ static int tab2ftab(CSOUND *csound, TABCOPY *p)
     return OK;
 }
 
+static int tab2ftabi(CSOUND *csound, TABCOPY *p)
+{
+    FUNC        *ftp;
+    int fsize;
+    MYFLT *fdata;
+    ARRAYDAT *t = p->tab;
+    int i, tlen = 0;
+
+    if (UNLIKELY(p->tab->data==NULL))
+      return csound->InitError(csound, Str("array-var not initialised"));
+    if (UNLIKELY((ftp = csound->FTFindP(csound, p->kfn)) == NULL))
+      return csound->InitError(csound, Str("No table for copy2ftab"));
+    for (i=0; i<t->dimensions; i++) tlen += t->sizes[i];
+    fsize = ftp->flen;
+    fdata = ftp->ftable;
+    if (fsize<tlen) tlen = fsize;
+    memcpy(fdata, p->tab->data, sizeof(MYFLT)*tlen);
+    return OK;
+}
+
+
 typedef struct {
   OPDS h;
   ARRAYDAT *tab;
@@ -1104,6 +1122,27 @@ static int tabgen(CSOUND *csound, TABGEN *p)
 }
 
 
+static int ftab2tabi(CSOUND *csound, TABCOPY *p)
+{
+    FUNC        *ftp;
+    int         fsize;
+    MYFLT       *fdata;
+    int tlen;
+
+    if (UNLIKELY((ftp = csound->FTFindP(csound, p->kfn)) == NULL))
+      return csound->InitError(csound,Str("No table for copy2ftab"));
+    fsize = ftp->flen;
+    if (UNLIKELY(p->tab->data==NULL)) {
+      tabensure(csound, p->tab, fsize);
+      p->tab->sizes[0] = fsize;
+    }
+    tlen = p->tab->sizes[0];
+    fdata = ftp->ftable;
+    if (fsize<tlen) tlen = fsize;
+    memcpy(p->tab->data, fdata, sizeof(MYFLT)*tlen);
+    return OK;
+}
+
 static int ftab2tab(CSOUND *csound, TABCOPY *p)
 {
     FUNC        *ftp;
@@ -1125,6 +1164,9 @@ static int ftab2tab(CSOUND *csound, TABCOPY *p)
     memcpy(p->tab->data, fdata, sizeof(MYFLT)*tlen);
     return OK;
 }
+
+
+
 
 typedef struct {
   OPDS h;
@@ -1987,6 +2029,7 @@ static OENTRY arrayvars_localops[] =
     { "##array_set.k", sizeof(ARRAY_SET), 0, 2, "", ".[].z",
       NULL, (SUBR)array_set },
     { "##array_get.i", sizeof(ARRAY_GET), 0, 1, "i", "i[]m", (SUBR)array_get },
+    /*{ "##array_get.i", sizeof(ARRAY_GET), 0, 1, "S", "S[]m", (SUBR)array_get },*/
     { "##array_get.k0", sizeof(ARRAY_GET), 0, 3, "k", "k[]z",
       (SUBR)array_get, (SUBR)array_get },
     { "##array_get.i2", sizeof(ARRAY_GET), 0, 3, ".", ".[]m",
@@ -2135,11 +2178,11 @@ static OENTRY arrayvars_localops[] =
     { "copy2ftab", sizeof(TABCOPY), TW|_QQ, 2, "", "k[]k", NULL, (SUBR) tab2ftab },
     { "copy2ttab", sizeof(TABCOPY), TR|_QQ, 2, "", "k[]k", NULL, (SUBR) ftab2tab },
     { "copya2ftab.k", sizeof(TABCOPY), TW, 3, "", "k[]k",
-      (SUBR) tab2ftab, (SUBR) tab2ftab },
+      (SUBR) tab2ftabi, (SUBR) tab2ftab },
     { "copyf2array.k", sizeof(TABCOPY), TR, 3, "", "k[]k",
-      (SUBR) ftab2tab, (SUBR) ftab2tab },
-    { "copya2ftab.i", sizeof(TABCOPY), TW, 1, "", "i[]i", (SUBR) tab2ftab },
-    { "copyf2array.i", sizeof(TABCOPY), TR, 1, "", "i[]i", (SUBR) ftab2tab },
+      (SUBR) ftab2tabi, (SUBR) ftab2tab },
+    { "copya2ftab.i", sizeof(TABCOPY), TW, 1, "", "i[]i", (SUBR) tab2ftabi },
+    { "copyf2array.i", sizeof(TABCOPY), TR, 1, "", "i[]i", (SUBR) ftab2tabi },
     /* { "lentab", 0xffff}, */
     { "lentab.i", sizeof(TABQUERY1), _QQ, 1, "i", "k[]p", (SUBR) tablength },
     { "lentab.k", sizeof(TABQUERY1), _QQ, 1, "k", "k[]p", NULL, (SUBR) tablength },

@@ -529,7 +529,7 @@ int pvstanalset(CSOUND *csound, PVST *p)
     p->scnt = p->fout[0]->overlap;
     p->tscale  = 1;
     p->pos =  *p->offset*CS_ESR;
-    printf("off: %f\n", *p->offset);
+    //printf("off: %f\n", *p->offset);
     p->accum = 0.0;
     return OK;
 }
@@ -557,7 +557,7 @@ int pvstanal(CSOUND *csound, PVST *p)
       ft = csound->FTnp2Find(csound,p->knum);
       if (ft == NULL){
         csound->PerfError(csound, p->h.insdshead,
-                          "could not find table number %d\n", (int) *p->knum);
+                          Str("could not find table number %d\n"), (int) *p->knum);
         return NOTOK;
 
       }
@@ -1039,6 +1039,7 @@ static int pvsmoothset(CSOUND *csound, PVSMOOTH *p)
         if (p->del.auxp == NULL || p->del.size < sizeof(float) * (N + 2))
           csound->AuxAlloc(csound, (N + 2) * sizeof(float), &p->del);
       }
+    memset(p->del.auxp, 0, (N + 2) * sizeof(float));
     p->fout->N = N;
     p->fout->overlap = p->fin->overlap;
     p->fout->winsize = p->fin->winsize;
@@ -1104,7 +1105,7 @@ static int pvsmoothprocess(CSOUND *csound, PVSMOOTH *p)
           /* amp smoothing */
           fout[i].re = fin[i].re * (1.0 + coef1) - del[i].re * coef1;
           /* freq smoothing */
-          fout[i].im = fin[i].im * (1.0 + coef2) - del[i].im * coef1;
+          fout[i].im = fin[i].im * (1.0 + coef2) - del[i].im * coef2;
           del[i] = fout[i];
         }
       }
@@ -1128,7 +1129,7 @@ static int pvsmoothprocess(CSOUND *csound, PVSMOOTH *p)
         /* amp smoothing */
         fout[i] = (float) (fin[i] * (1.0 + coef1) - del[i] * coef1);
         /* freq smoothing */
-        fout[i + 1] = (float) (fin[i + 1] * (1.0 + coef2) - del[i + 1] * coef1);
+        fout[i + 1] = (float) (fin[i + 1] * (1.0 + coef2) - del[i + 1] * coef2);
         del[i] = fout[i];
         del[i + 1] = fout[i + 1];
       }
@@ -1747,8 +1748,8 @@ static int pvsshift(CSOUND *csound, PVSSHIFT *p)
           fout[i] = 0.0f;
         else
           fout[i] *= g;
-        binf = (i/2)*sr/N;
-        if (fenv[i/2] && binf < sr/2+pshift ) fin[i] *= fenv[i/2];
+        /*binf = (i/2)*sr/N;
+        x  if (fenv[i/2] && binf < sr/2+pshift ) fin[i] *= fenv[i/2];*/
       }
 
       p->fout->framecount = p->lastframe = p->fin->framecount;

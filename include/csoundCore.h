@@ -71,7 +71,7 @@ extern "C" {
 #include <xlocale.h>
 #endif
 
-#if (defined(__MACH__) || defined(ANDROID) || defined(NACL))
+#if (defined(__MACH__) || defined(ANDROID) || defined(NACL) || defined(__CYGWIN__))
 #define BARRIER_SERIAL_THREAD (-1)
 typedef struct {
   pthread_mutex_t mut;
@@ -1274,7 +1274,7 @@ typedef struct NAME__ {
     int (*OpenLibrary)(void **library, const char *libraryPath);
     int (*CloseLibrary)(void *library);
     void *(*GetLibrarySymbol)(void *library, const char *procedureName);
-#if defined (__CUDACC__) || defined (__MACH__) 
+#if defined (__CUDACC__) || defined (__MACH__)
     char *(*LocalizeString)(const char *);
 #else
     char *(*LocalizeString)(const char *) __attribute__ ((format_arg (1)));
@@ -1667,7 +1667,7 @@ typedef struct NAME__ {
     int           dag_changed;
     int           dag_num_active;
     INSDS         **dag_task_map;
-    volatile enum state    *dag_task_status;
+    volatile stateWithPadding    *dag_task_status;
     watchList     * volatile *dag_task_watch;
     watchList     *dag_wlmm;
     char          **dag_task_dep;
