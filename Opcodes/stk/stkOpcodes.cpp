@@ -17,7 +17,7 @@
   02111-1307 USA
 */
 /*
- * CSOUND 5 OPCODES FOR PERRY COOK'S SYNTHESIS TOOLKIT IN C++ (STK) INSTRUMENT
+ * CSOUND 5/6 OPCODES FOR PERRY COOK'S SYNTHESIS TOOLKIT IN C++ (STK) INSTRUMENT
  *
  * This code is copyright (C) 2005 by Michael Gogins. It is licensed under the
  * same terms as the Synthesis Tookit in C++ by Perry R. Cook and Gary P. Scavone.
@@ -46,6 +46,7 @@
  * See the STK class documentation to determine the controller numbers
  * used by each instrument.
  */
+#ifndef JPFF
 #include <Stk.h>
 #include <BandedWG.h>
 #include <BeeThree.h>
@@ -75,7 +76,37 @@
 #include <VoicForm.h>
 #include <Whistle.h>
 #include <Wurley.h>
-
+#else
+#include "include/Stk.h"
+#include "include/BandedWG.h"
+#include "include/BeeThree.h"
+#include "include/BlowBotl.h"
+#include "include/BlowHole.h"
+#include "include/Bowed.h"
+#include "include/Brass.h"
+#include "include/Clarinet.h"
+#include "include/Drummer.h"
+#include "include/Flute.h"
+#include "include/FMVoices.h"
+#include "include/HevyMetl.h"
+#include "include/Mandolin.h"
+//#include "include/Mesh2D.h"
+#include "include/ModalBar.h"
+#include "include/Moog.h"
+#include "include/PercFlut.h"
+#include "include/Plucked.h"
+#include "include/Resonate.h"
+#include "include/Rhodey.h"
+#include "include/Saxofony.h"
+#include "include/Shakers.h"
+#include "include/Simple.h"
+#include "include/Sitar.h"
+#include "include/StifKarp.h"
+#include "include/TubeBell.h"
+#include "include/VoicForm.h"
+#include "include/Whistle.h"
+#include "include/Wurley.h"
+#endif
 using namespace stk;
 
 #define __BUILDING_LIBCSOUND
@@ -718,7 +749,8 @@ extern "C"
     if(!path)
       {
         csound->Warning(csound,
-                        Str("STK opcodes not available: define environment variable RAWWAVE_PATH\n"
+                        Str("STK opcodes not available: define environment "
+                            "variable RAWWAVE_PATH\n"
                              "(points to rawwaves directory) to use STK opcodes."));
         return 0;
       }
