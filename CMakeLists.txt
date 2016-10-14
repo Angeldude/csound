@@ -8,8 +8,6 @@ cmake_minimum_required(VERSION 2.8.3)
 
 project(Csound)
 
-include("${CUSTOM_CMAKE}" OPTIONAL)
-
 ENABLE_TESTING()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
@@ -291,7 +289,7 @@ option(BUILD_UTILITIES "Build stand-alone executables for utilities that can als
 
 option(NEW_PARSER_DEBUG "Enable tracing of new parser" OFF)
 
-option(SCORE_PARSER "Enable building of alternative score parser" OFF)
+option(SCORE_PARSER "Enable building of alternative score parser" ON)
 
 option(BUILD_MULTI_CORE "Enable building for multicore system (requires BUILD_NEW_PARSER)" ON)
 
@@ -322,6 +320,10 @@ if (HAS_CXX_VISIBILITY_HIDDEN)
 endif()
 
 if(APPLE)
+if(IOS)
+message(STATUS "Building for iOS.")
+else()
+message(STATUS "Building for OSX")
   if(BUILD_INSTALLER)
     set(CS_FRAMEWORK_DEST "${CMAKE_INSTALL_PREFIX}")
   endif()
@@ -338,7 +340,11 @@ if(APPLE)
   endif()
 
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_VECLIB")
- 
+
+  if(NOT VECLIB_PATH)
+    set(VECLIB_PATH "/System/Library/Frameworks/")
+  endif()
+ endif()
    
 endif()
 
@@ -472,6 +478,15 @@ if(NOT PTHREAD_LIBRARY AND NOT EMSCRIPTEN)
     message(FATAL_ERROR "Csound requires the pthread library")
 endif()
 
+#if(NOT EMSCRIPTEN)
+#  find_path(PTHREAD_H_PATH pthread.h)
+#  if(PTHREAD_H_PATH)
+#      include_directories(${PTHREAD_H_PATH})
+#  else()
+#      message(FATAL_ERROR "Could not find pthread.h")
+#  endif()
+#endif()
+
 set(CMAKE_REQUIRED_INCLUDES pthread.h)
 set(CMAKE_REQUIRED_LIBRARIES pthread)
 
@@ -601,7 +616,6 @@ set(libcsound_SRCS
     Engine/musmon.c
     Engine/namedins.c
     Engine/rdscor.c
-    Engine/scope.c
     Engine/scsort.c
     Engine/scxtract.c
     Engine/sort.c
@@ -646,7 +660,6 @@ set(libcsound_SRCS
     OOps/str_ops.c
     OOps/ugens1.c
     OOps/ugens2.c
-    OOps/ugens2a.c
     OOps/ugens3.c
     OOps/ugens4.c
     OOps/ugens5.c
@@ -823,7 +836,7 @@ set(YACC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_orc.y)
 set(YACC_OUT ${CMAKE_CURRENT_BINARY_DIR}/csound_orcparse.c)
 set(YACC_OUTH ${CMAKE_CURRENT_BINARY_DIR}/csound_orcparse.h)
 
-set(LEX_SRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_orc.l)
+set(LEX_SRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_orc.lex)
 set(LEX_OUT ${CMAKE_CURRENT_BINARY_DIR}/csound_orclex.c)
 
 set(PRELEX_SRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_pre.lex)
@@ -869,12 +882,12 @@ if(SCORE_PARSER)
     #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCORE_PARSER")
     list(APPEND libcsound_CFLAGS -DSCORE_PARSER)
 
-    set(YACC_SCOSRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_sco.y)
-    set(YACC_SCOOUT ${CMAKE_CURRENT_BINARY_DIR}/csound_scoparse.c)
-    set(YACC_SCOOUTH ${CMAKE_CURRENT_BINARY_DIR}/csound_scoparse.h)
+    #set(YACC_SCOSRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_sco.y)
+    #set(YACC_SCOOUT ${CMAKE_CURRENT_BINARY_DIR}/csound_scoparse.c)
+    #set(YACC_SCOOUTH ${CMAKE_CURRENT_BINARY_DIR}/csound_scoparse.h)
 
-    set(LEX_SCOSRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_sco.lex)
-    set(LEX_SCOOUT ${CMAKE_CURRENT_BINARY_DIR}/csound_scolex.c)
+    #set(LEX_SCOSRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_sco.lex)
+    #set(LEX_SCOOUT ${CMAKE_CURRENT_BINARY_DIR}/csound_scolex.c)
 
     set(PRELEX_SCOSRC ${CMAKE_CURRENT_SOURCE_DIR}/Engine/csound_prs.lex)
     set(PRELEX_SCOOUT ${CMAKE_CURRENT_BINARY_DIR}/csound_prslex.c)
@@ -883,11 +896,11 @@ if(SCORE_PARSER)
     ##message("${CMAKE_CURRENT_BINARY_DIR}/csound_scolex.c")
     ##message("${CMAKE_CURRENT_BINARY_DIR}/csound_scoparse.c")
 
-    add_custom_command(
-        OUTPUT ${LEX_SCOOUT}
-        DEPENDS ${LEX_SCOSRC}
-        COMMAND ${FLEX_EXECUTABLE} ARGS -B -t ${LEX_SCOSRC} > ${LEX_SCOOUT}
-        )
+    #add_custom_command(
+    #    OUTPUT ${LEX_SCOOUT}
+    #    DEPENDS ${LEX_SCOSRC}
+    #    COMMAND ${FLEX_EXECUTABLE} ARGS -B -t ${LEX_SCOSRC} > ${LEX_SCOOUT}
+    #    )
 
     add_custom_command(
         OUTPUT ${PRELEX_SCOOUT}
@@ -895,18 +908,18 @@ if(SCORE_PARSER)
         COMMAND ${FLEX_EXECUTABLE} ARGS -B -t -d ${PRELEX_SCOSRC} > ${PRELEX_SCOOUT}
         )
 
-    add_custom_command(
-        OUTPUT ${YACC_SCOOUT} ${YACC_SCOOUTH}
-        DEPENDS ${YACC_SCOSRC} ${LEX_SCOOUT}
-        COMMAND ${BISON_EXECUTABLE}
-        ARGS -pcsound_sco -t -d --report=itemset -o ${YACC_SCOOUT} ${YACC_SCOSRC}
-        )
+    #add_custom_command(
+    #    OUTPUT ${YACC_SCOOUT} ${YACC_SCOOUTH}
+    #    DEPENDS ${YACC_SCOSRC} ${LEX_SCOOUT}
+    #    COMMAND ${BISON_EXECUTABLE}
+    #    ARGS -pcsound_sco -t -d --report=itemset -o ${YACC_SCOOUT} ${YACC_SCOSRC}
+    #    )
 
-    list(APPEND libcsound_SRCS
-        ${LEX_SCOOUT} ${YACC_SCOOUT} ${PRELEX_SCOOUT})
+    list(APPEND libcsound_SRCS ${PRELEX_SCOOUT})
+        #${LEX_SCOOUT} ${YACC_SCOOUT} ${PRELEX_SCOOUT})
 
-    set_source_files_properties(${YACC_SCOOUT} GENERATED)
-    set_source_files_properties(${LEX_SCOOUT} GENERATED)
+    #set_source_files_properties(${YACC_SCOOUT} GENERATED)
+    #set_source_files_properties(${LEX_SCOOUT} GENERATED)
     set_source_files_properties(${PRELEX_SCOOUT} GENERATED)
 
 else()
@@ -1142,7 +1155,7 @@ if(LINUX)
     endif()
 endif()
 
-if(APPLE)
+if(APPLE AND NOT IOS)
     message(STATUS "Building on OSX")
     add_definitions(-DMACOSX -DPIPES -DNO_FLTK_THREADS -DHAVE_SOCKETS)
     find_library(ACCELERATE_LIBRARY Accelerate)

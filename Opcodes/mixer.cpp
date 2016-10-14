@@ -378,7 +378,7 @@ extern "C"
     return 0;
   }
 
-  PUBLIC int csoundModuleInit(CSOUND *csound)
+  PUBLIC int csoundModuleInit_mixer(CSOUND *csound)
   {
     OENTRY  *ep = (OENTRY*) &(localops[0]);
     int     err = 0;
@@ -393,6 +393,11 @@ extern "C"
       ep++;
     }
     return err;
+  }
+
+  PUBLIC int csoundModuleInit(CSOUND *csound)
+  {
+      return csoundModuleInit_mixer(csound);
   }
 
 }   // END EXTERN C

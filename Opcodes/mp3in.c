@@ -56,150 +56,150 @@ typedef struct {
 
 int mp3in_cleanup(CSOUND *csound, MP3IN *p)
 {
-  if (p->mpa != NULL)
-    mp3dec_uninit(p->mpa);
-  return OK;
+    if (p->mpa != NULL)
+      mp3dec_uninit(p->mpa);
+    return OK;
 }
 
 int mp3ininit_(CSOUND *csound, MP3IN *p, int stringname)
 {
-  char    name[1024];
-  int     fd;
-  mp3dec_t mpa           = NULL;
-  mpadec_config_t config = { MPADEC_CONFIG_FULL_QUALITY, MPADEC_CONFIG_STEREO,
-                             MPADEC_CONFIG_16BIT, MPADEC_CONFIG_LITTLE_ENDIAN,
-                             MPADEC_CONFIG_REPLAYGAIN_NONE, TRUE, TRUE, TRUE,
-                             0.0 };
-  mpadec_info_t mpainfo;
-  int buffersize = (*p->ibufsize<=0.0 ? /*0x1000*/ 8*1152 : (int)*p->ibufsize);
-  /* uint64_t maxsize; */
-  int r;
-  int skip;
-  if (p->OUTOCOUNT==1) config.mode = MPADEC_CONFIG_MONO;
-  /* if already open, close old file first */
-  if (p->fdch.fd != NULL) {
+    char    name[1024];
+    int     fd;
+    mp3dec_t mpa           = NULL;
+    mpadec_config_t config = { MPADEC_CONFIG_FULL_QUALITY, MPADEC_CONFIG_STEREO,
+                               MPADEC_CONFIG_16BIT, MPADEC_CONFIG_LITTLE_ENDIAN,
+                               MPADEC_CONFIG_REPLAYGAIN_NONE, TRUE, TRUE, TRUE,
+                               0.0 };
+    mpadec_info_t mpainfo;
+    int buffersize = (*p->ibufsize<=0.0 ? /*0x1000*/ 8*1152 : (int)*p->ibufsize);
+    /* uint64_t maxsize; */
+    int r;
+    int skip;
+    if (p->OUTOCOUNT==1) config.mode = MPADEC_CONFIG_MONO;
+    /* if already open, close old file first */
+    if (p->fdch.fd != NULL) {
+      /* skip initialisation if requested */
+      if (*(p->iSkipInit) != FL(0.0))
+        return OK;
+      csound->FDClose(csound, &(p->fdch));
+    }
+    /* set default format parameters */
+    /* open file */
+
+    p->mpa = mpa = mp3dec_init();
+    if (UNLIKELY(!mpa)) {
+      return csound->InitError(csound, Str("Not enough memory\n"));
+    }
+
+    if (UNLIKELY((r = mp3dec_configure(mpa, &config)) != MP3DEC_RETCODE_OK)) {
+      mp3dec_uninit(mpa);
+      p->mpa = NULL;
+      return csound->InitError(csound, "%s", mp3dec_error(r));
+    }
+
+
+    /* FIXME: name can overflow with very long string */
+    if(stringname==0){
+      if (csound->ISSTRCOD(*p->iFileCode))
+        strncpy(name,get_arg_string(csound, *p->iFileCode), 1023);
+      else csound->strarg2name(csound, name, p->iFileCode, "soundin.",0);
+    }
+    else strncpy(name, ((STRINGDAT *)p->iFileCode)->data, 1023);
+
+    if (UNLIKELY(csound->FileOpen2(csound, &fd, CSFILE_FD_R,
+                                   name, "rb", "SFDIR;SSDIR",
+                                   CSFTYPE_OTHER_BINARY, 0) == NULL)) {
+      mp3dec_uninit(mpa);
+      return
+        csound->InitError(csound, Str("mp3in: %s: failed to open file"), name);
+    }
+    /* HOW TO record file handle so that it will be closed at note-off */
+    /* memset(&(p->fdch), 0, sizeof(FDCH)); */
+    /* p->fdch.fd = fd; */
+    /* fdrecord(csound, &(p->fdch)); */
+    if (UNLIKELY((r = mp3dec_init_file(mpa, fd, 0, FALSE)) != MP3DEC_RETCODE_OK)) {
+      mp3dec_uninit(mpa);
+      return csound->InitError(csound, "%s", mp3dec_error(r));
+    }
+    if (UNLIKELY((r = mp3dec_get_info(mpa, &mpainfo, MPADEC_INFO_STREAM)) !=
+                 MP3DEC_RETCODE_OK)) {
+      mp3dec_uninit(mpa);
+      return csound->InitError(csound, "%s", mp3dec_error(r));
+    }
+    skip = (int)(*p->iSkipTime*CS_ESR);
+
+    /* maxsize = mpainfo.decoded_sample_size */
+    /*          *mpainfo.decoded_frame_samples */
+    /*          *mpainfo.frames; */
+    /* csound->Message(csound, "maxsize = %li\n", maxsize); */
+    /* print file information */
+    /* if (UNLIKELY(csound->oparms_.msglevel & WARNMSG)) */ {
+      char temp[80];
+      if (mpainfo.frequency < 16000) strcpy(temp, "MPEG-2.5 ");
+      else if (mpainfo.frequency < 32000) strcpy(temp, "MPEG-2 ");
+      else strcpy(temp, "MPEG-1 ");
+      if (mpainfo.layer == 1) strcat(temp, "Layer I");
+      else if (mpainfo.layer == 2) strcat(temp, "Layer II");
+      else strcat(temp, "Layer III");
+      csound->Warning(csound, "Input:  %s, %s, %d kbps, %d Hz  (%d:%02d)\n",
+                      temp, ((mpainfo.channels > 1) ? "stereo" : "mono"),
+                      mpainfo.bitrate, mpainfo.frequency, mpainfo.duration/60,
+                      mpainfo.duration%60);
+    }
+    /* check number of channels in file (must equal the number of outargs) */
+    /* if (UNLIKELY(sfinfo.channels != p->nChannels && */
+    /*              (csound->oparms_.msglevel & WARNMSG) != 0)) { */
+    /*   mp3dec_uninit(mpa); */
+    /*   return csound->InitError(csound, */
+    /*                      Str("mp3in: number of output args " */
+    /*                          "inconsistent with number of file channels")); */
+    /* } */
     /* skip initialisation if requested */
     if (*(p->iSkipInit) != FL(0.0))
       return OK;
-    csound->FDClose(csound, &(p->fdch));
-  }
-  /* set default format parameters */
-  /* open file */
-
-  p->mpa = mpa = mp3dec_init();
-  if (UNLIKELY(!mpa)) {
-    return csound->InitError(csound, Str("Not enough memory\n"));
-  }
-
-  if (UNLIKELY((r = mp3dec_configure(mpa, &config)) != MP3DEC_RETCODE_OK)) {
-    mp3dec_uninit(mpa);
-    p->mpa = NULL;
-    return csound->InitError(csound, "%s", mp3dec_error(r));
-  }
-
-
-  /* FIXME: name can overflow with very long string */
-  if(stringname==0){
-    if (csound->ISSTRCOD(*p->iFileCode))
-      strncpy(name,get_arg_string(csound, *p->iFileCode), 1023);
-    else csound->strarg2name(csound, name, p->iFileCode, "soundin.",0);
-  }
-  else strncpy(name, ((STRINGDAT *)p->iFileCode)->data, 1023);
-
-  if (UNLIKELY(csound->FileOpen2(csound, &fd, CSFILE_FD_R,
-                                 name, "rb", "SFDIR;SSDIR",
-                                 CSFTYPE_OTHER_BINARY, 0) == NULL)) {
-    mp3dec_uninit(mpa);
-    return
-      csound->InitError(csound, Str("mp3in: %s: failed to open file"), name);
-  }
-  /* HOW TO record file handle so that it will be closed at note-off */
-  /* memset(&(p->fdch), 0, sizeof(FDCH)); */
-  /* p->fdch.fd = fd; */
-  /* fdrecord(csound, &(p->fdch)); */
-  if (UNLIKELY((r = mp3dec_init_file(mpa, fd, 0, FALSE)) != MP3DEC_RETCODE_OK)) {
-    mp3dec_uninit(mpa);
-    return csound->InitError(csound, "%s", mp3dec_error(r));
-  }
-  if (UNLIKELY((r = mp3dec_get_info(mpa, &mpainfo, MPADEC_INFO_STREAM)) !=
-               MP3DEC_RETCODE_OK)) {
-    mp3dec_uninit(mpa);
-    return csound->InitError(csound, "%s", mp3dec_error(r));
-  }
-  skip = (int)(*p->iSkipTime*CS_ESR);
-
-  /* maxsize = mpainfo.decoded_sample_size */
-  /*          *mpainfo.decoded_frame_samples */
-  /*          *mpainfo.frames; */
-  /* csound->Message(csound, "maxsize = %li\n", maxsize); */
-  /* print file information */
-  /* if (UNLIKELY(csound->oparms_.msglevel & WARNMSG)) */ {
-    char temp[80];
-    if (mpainfo.frequency < 16000) strcpy(temp, "MPEG-2.5 ");
-    else if (mpainfo.frequency < 32000) strcpy(temp, "MPEG-2 ");
-    else strcpy(temp, "MPEG-1 ");
-    if (mpainfo.layer == 1) strcat(temp, "Layer I");
-    else if (mpainfo.layer == 2) strcat(temp, "Layer II");
-    else strcat(temp, "Layer III");
-    csound->Warning(csound, "Input:  %s, %s, %d kbps, %d Hz  (%d:%02d)\n",
-                    temp, ((mpainfo.channels > 1) ? "stereo" : "mono"),
-                    mpainfo.bitrate, mpainfo.frequency, mpainfo.duration/60,
-                    mpainfo.duration%60);
-  }
-  /* check number of channels in file (must equal the number of outargs) */
-  /* if (UNLIKELY(sfinfo.channels != p->nChannels && */
-  /*              (csound->oparms_.msglevel & WARNMSG) != 0)) { */
-  /*   mp3dec_uninit(mpa); */
-  /*   return csound->InitError(csound, */
-  /*                      Str("mp3in: number of output args " */
-  /*                          "inconsistent with number of file channels")); */
-  /* } */
-  /* skip initialisation if requested */
-  if (*(p->iSkipInit) != FL(0.0))
-    return OK;
-  /* set file parameters from header info */
-  if ((int) (CS_ESR + FL(0.5)) != mpainfo.frequency) {
-    csound->Warning(csound, Str("mp3in: file sample rate (%d) "
-                                "!= orchestra sr (%d)\n"),
-                    mpainfo.frequency, (int) (CS_ESR + FL(0.5)));
-  }
-  /* initialise buffer */
-  mp3dec_seek(mpa,0, MP3DEC_SEEK_SAMPLES);
-  p->bufSize = buffersize;
-  if (p->auxch.auxp == NULL || p->auxch.size < (unsigned int)buffersize)
-    csound->AuxAlloc(csound, buffersize, &p->auxch);
-  p->buf = (uint8_t *) p->auxch.auxp;
-  p->bufused = -1;
-  buffersize /= (mpainfo.decoded_sample_size);
-  //printf("===%d \n", skip);
-  //skip = skip - 528;
-  while (skip > 0) {
-     int xx= skip;
-     // printf("%d \n", skip);
-    if (xx > buffersize) xx = buffersize;
-    skip -= xx;
-    r = mp3dec_decode(mpa, p->buf, mpainfo.decoded_sample_size*xx, &p->bufused);
-    // printf("u %d \n", p->bufused);
+    /* set file parameters from header info */
+    if ((int) (CS_ESR + FL(0.5)) != mpainfo.frequency) {
+      csound->Warning(csound, Str("mp3in: file sample rate (%d) "
+                                  "!= orchestra sr (%d)\n"),
+                      mpainfo.frequency, (int) (CS_ESR + FL(0.5)));
     }
-  //if(!skip)
-  //mp3dec_seek(mpa, skip, MP3DEC_SEEK_SAMPLES);
-  p->r = r;
-  if(p->initDone == -1)
-    csound->RegisterDeinitCallback(csound, p,
-                                   (int (*)(CSOUND*, void*)) mp3in_cleanup);
-  /* done initialisation */
-  p->initDone = -1;
-  p->pos = 0;
+    /* initialise buffer */
+    mp3dec_seek(mpa,0, MP3DEC_SEEK_SAMPLES);
+    p->bufSize = buffersize;
+    if (p->auxch.auxp == NULL || p->auxch.size < (unsigned int)buffersize)
+      csound->AuxAlloc(csound, buffersize, &p->auxch);
+    p->buf = (uint8_t *) p->auxch.auxp;
+    p->bufused = -1;
+    buffersize /= (mpainfo.decoded_sample_size);
+    //printf("===%d \n", skip);
+    //skip = skip - 528;
+    while (skip > 0) {
+      int xx= skip;
+      // printf("%d \n", skip);
+      if (xx > buffersize) xx = buffersize;
+      skip -= xx;
+      r = mp3dec_decode(mpa, p->buf, mpainfo.decoded_sample_size*xx, &p->bufused);
+      // printf("u %d \n", p->bufused);
+    }
+    //if(!skip)
+    //mp3dec_seek(mpa, skip, MP3DEC_SEEK_SAMPLES);
+    p->r = r;
+    if(p->initDone == -1)
+      csound->RegisterDeinitCallback(csound, p,
+                                     (int (*)(CSOUND*, void*)) mp3in_cleanup);
+    /* done initialisation */
+    p->initDone = -1;
+    p->pos = 0;
 
-  return OK;
+    return OK;
 }
 
 int mp3ininit(CSOUND *csound, MP3IN *p){
-  return mp3ininit_(csound,p,0);
+    return mp3ininit_(csound,p,0);
 }
 
 int mp3ininit_S(CSOUND *csound, MP3IN *p){
-  return mp3ininit_(csound,p,1);
+    return mp3ininit_(csound,p,1);
 }
 
 
@@ -528,7 +528,8 @@ static int sinit3_(CSOUND *csound, DATASPACE *p)
     int xx= skip;
     if (xx > buffersize) xx = buffersize;
     skip -= xx;
-    r = mp3dec_decode(mpa, p->buffer.auxp, mpainfo.decoded_sample_size*xx, &p->bufused);
+    r = mp3dec_decode(mpa, p->buffer.auxp,
+                      mpainfo.decoded_sample_size*xx, &p->bufused);
     }*/
   mp3dec_seek(mpa, skip, MP3DEC_SEEK_SAMPLES);
 
@@ -1009,6 +1010,7 @@ void decode_seek(CSOUND *csound, mp3dec_t mpa, int skip){
     }
 }
 
+
 static int filinit(CSOUND *csound, LOADER *pp)
 {
   MP3SCAL2 *p = &(pp->p);
@@ -1024,6 +1026,8 @@ static int filinit(CSOUND *csound, LOADER *pp)
                              0.0 };
   mpadec_info_t mpainfo;
   int buffsize = 32768;
+
+  p->init = 0;
   if(*pp->bfs) buffsize = *pp->bfs*8;
 
   name = pp->name->data;
@@ -1046,7 +1050,7 @@ static int filinit(CSOUND *csound, LOADER *pp)
     p->error = -1;
     return NOTOK;
   }
-  if (UNLIKELY((r = mp3dec_init_file(mpa, fd, 0, FALSE)) != MP3DEC_RETCODE_OK)) {
+  if (UNLIKELY((r = mp3dec_init_file(mpa, fd, 0, TRUE)) != MP3DEC_RETCODE_OK)) {
     mp3dec_uninit(mpa);
     p->error = r;
     return NOTOK;
@@ -1090,42 +1094,43 @@ static int filinit(CSOUND *csound, LOADER *pp)
   size =  buffsize*sizeof(short)/4;
   if (p->buffer.auxp == NULL || p->buffer.size < size)
     csound->AuxAlloc(csound, size, &p->buffer);
-
+  /*double dtime;
+    struct timespec ts;
+     clock_gettime(CLOCK_MONOTONIC, &ts);
+     dtime = ts.tv_sec + 1e-9*ts.tv_nsec;
+   */
 
   int skip = (int)(*pp->skip*mpainfo.frequency);
   p->bufused = -1;
-
-
   /* mp3_seek operates on multiples of 1152 frames */
   int frmsiz = mpainfo.decoded_frame_samples;
-  if (skip==0) skip = 1;
-
-   {
-     skip -= 528;  /* compensate for no gap decoding */
-     int skips = (skip/frmsiz)*frmsiz;
-     int offs = 0;
-     if(mpainfo.frequency == 44100 &&
-        mpainfo.bitrate == 192 &&
-        *pp->skip > 0.09) offs = frmsiz;
-     // double dtime;
-     //struct timespec ts;
-     //clock_gettime(CLOCK_MONOTONIC, &ts);
-     //dtime = ts.tv_sec + 1e-9*ts.tv_nsec;
-
-     //if(*pp->skip < FL(5.0))
-     //  decode_seek(csound, mpa,skips);
-     //else
-       mp3dec_seek(mpa, skips-offs, MP3DEC_SEEK_SAMPLES);
+   if(skip > 0) {
+     int ftbr = skip/frmsiz;
+     int skips = ftbr*frmsiz;
+     MYFLT fsize = (FL(125.0)*mpainfo.bitrate*frmsiz)/mpainfo.frequency;
+     if(fsize - (int) fsize > FL(0.0)){
+       char dat[4];
+       int byts, pad, i;
+       mp3dec_seek(mpa, 0, MP3DEC_SEEK_SAMPLES);
+       for(i=0; i < ftbr; i++){
+        byts = read(fd,dat,4);
+        pad = dat[2] & 0x02 ? 1 : 0;
+        lseek(fd,(int)fsize + pad - 4, SEEK_CUR);
+        //printf("skip %d pad %d \n", i, pad);
+       }
+     } else
+        mp3dec_seek(mpa, skips, MP3DEC_SEEK_SAMPLES);
      skip = skip - skips;
+    } else mp3dec_seek(mpa, 0, MP3DEC_SEEK_SAMPLES);
 
-     //clock_gettime(CLOCK_MONOTONIC, &ts);
-     //dtime = ts.tv_sec + 1e-9*ts.tv_nsec - dtime;
-     //csound->Message(csound, "load time %f \n", dtime);
-   } /*else mp3dec_seek(mpa, 0, MP3DEC_SEEK_SAMPLES);*/
+   /*clock_gettime(CLOCK_MONOTONIC, &ts);
+     dtime = ts.tv_sec + 1e-9*ts.tv_nsec - dtime;
+     csound->Message(csound, "skip time %f \n", dtime);*/
 
   // fill buffers
   p->orsr = mpainfo.frequency;
   p->curbuf = 0;
+  p->finished = 0;
   p->nsmps = buffsize/8;
   buffiller((void *)p);
   buffiller((void *)p);
@@ -1134,18 +1139,19 @@ static int filinit(CSOUND *csound, LOADER *pp)
   buffiller((void *)p);
   buffiller((void *)p);
   buffiller((void *)p);
-  //buffiller((void *)p);
+  buffiller((void *)p);
 
-  p->pos = skip*csound->GetSr(csound)/p->orsr;// ? skip : -528;
+  p->pos = skip*csound->GetSr(csound)/p->orsr;
   p->tscale  = 0;
   p->accum = 0;
   p->tab[0] = (MYFLT *) p->fdata[0].auxp;
   p->tab[1] = (MYFLT *) p->fdata[1].auxp;
   p->tstamp = 0;
   p->finished = 0;
-  p->init = 1;
   p->skip = *pp->skip;
-  p->filling = 7;
+  p->filling = 0;
+  p->init = 1;
+
   return OK;
 }
 
@@ -1168,7 +1174,8 @@ static int loader_init(CSOUND *csound, LOADER *pp){
   p->init = 0;
   p->ti = 0;
   if(p->playing == 0){
-    pthread_create(&(pp->p.t), NULL, loader_thread, pp);
+    if(pthread_create(&(pp->p.t), NULL, loader_thread, pp) != 0)
+      csound->Message(csound, "failed to start thread \n");
     struct sched_param param;
     int policy;
     pthread_getschedparam((pp->p.t), &policy,
@@ -1239,7 +1246,6 @@ int mp3dec_cleanup_player(CSOUND *csound,  PLAYER  *p)
     mp3dec_uninit(p->p->mpa);
   p->p->mpa = NULL;
 #ifdef HAVE_NEON
-
   pffft_destroy_setup(p->setup);
   pffft_aligned_free(p->bw);
   pffft_aligned_free(p->fw);
@@ -1382,7 +1388,8 @@ static int player_play(CSOUND *csound, PLAYER *pp)
   uint32_t offset = pp->h.insdshead->ksmps_offset;
   uint32_t early  = pp->h.insdshead->ksmps_no_end;
   int decim = p->decim;
-  MYFLT pitch = *pp->kpitch*p->resamp, time = *pp->time*p->resamp, lock = *pp->klock;
+  MYFLT pitch = *pp->kpitch*p->resamp, time = *pp->time*p->resamp,
+         lock = *pp->klock;
   double amp = *pp->kamp*csound->Get0dBFS(csound)*(8./decim)/3.;
   int interp = *pp->kinterp;
 #ifdef __clang__
@@ -1432,6 +1439,7 @@ static int player_play(CSOUND *csound, PLAYER *pp)
       out = j == 0 ? pp->out1 : pp->out2;
       memset(out, '\0', nsmps*sizeof(MYFLT));
     }
+    csound->Message(csound, "not init \n");
     p->ti++;
     *pp->kstamp = 0;
     return OK;
@@ -2012,7 +2020,8 @@ static int filinit2(CSOUND *csound, LOADER *pp)
   int i,j,k;
   uint32_t bufused = 0;
   for(i=0;i<end;i+=frmsiz){
-    mp3dec_decode(mpa, (unsigned char *)decbuffer,frmsiz*sizeof(short)*MP3_CHNS,&bufused);
+    mp3dec_decode(mpa, (unsigned char *)decbuffer,
+                  frmsiz*sizeof(short)*MP3_CHNS,&bufused);
     //int ss = (bufused/sizeof(short))/MP3_CHNS;
     for(k=j=0;k<frmsiz;j+=2,k++){
       left[i+k] = decbuffer[j]/32768.;
@@ -2097,8 +2106,9 @@ static int player_play2(CSOUND *csound, PLAYER *pp)
   uint32_t offset = pp->h.insdshead->ksmps_offset;
   uint32_t early  = pp->h.insdshead->ksmps_no_end;
   int decim = p->decim;
-  MYFLT pitch = *pp->kpitch*p->resamp, time = *pp->time*p->resamp, lock = *pp->klock;
-  double amp = *pp->kamp*csound->Get0dBFS(csound)*(8./decim)/3.;
+  MYFLT pitch = *pp->kpitch*p->resamp, time = *pp->time*p->resamp,
+         lock = *pp->klock;
+  double amp = *pp->kamp*csound->Get0dBFS(csound)*(8.0/decim)/3.0;
   int interp = *pp->kinterp;
 #ifdef __clang__
   MYFLT *restrict out;

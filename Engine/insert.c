@@ -289,7 +289,6 @@ int insert(CSOUND *csound, int insno, EVTBLK *newevtp)
     ip->init_done = 0;
 #endif
 
-
     if (csound->realtime_audio_flag == 0) {
      csound->curip    = ip;
      csound->ids      = (OPDS *)ip;
@@ -771,7 +770,7 @@ static void deact(CSOUND *csound, INSDS *ip)
 
 int kill_instance(CSOUND *csound, KILLOP *p) {
     if (LIKELY(*p->inst)) xturnoff(csound, (INSDS *) ((long)*p->inst));
-  else csound->Warning(csound, "instance not valid \n");
+    else csound->Warning(csound, Str("instance not valid \n"));
   return OK;
 }
 
@@ -1224,7 +1223,6 @@ int useropcdset(CSOUND *csound, UOPCODE *p)
     if (!p->ip) {
       /* search for already allocated, but not active instance */
       /* if none was found, allocate a new instance */
-
       if (!tp->act_instance)
         instance(csound, instno);
     /* **** COVERITY: note that call to instance fills in structure to
@@ -2122,7 +2120,8 @@ static void instance(CSOUND *csound, int insno)
     tp->act_instance = ip;
     ip->insno = insno;
     if (UNLIKELY(csound->oparms->odebug))
-      csoundMessage(csound,"instance(): tp->act_instance = %p \n", tp->act_instance);
+      csoundMessage(csound,"instance(): tp->act_instance = %p \n",
+                    tp->act_instance);
 
 
     if (insno > csound->engineState.maxinsno) {
@@ -2230,7 +2229,7 @@ static void instance(CSOUND *csound, int insno)
           fltp = &(pfield->value);
         }
         else {
-          csound->Message(csound, "FIXME: Unhandled out-arg type: %d\n",
+          csound->Message(csound, Str("FIXME: Unhandled out-arg type: %d\n"),
                           arg->type);
           fltp = NULL;
         }
@@ -2270,7 +2269,7 @@ static void instance(CSOUND *csound, int insno)
                               findLabelMemOffset(csound, tp, (char*)arg->argPtr));
         }
         else {
-          csound->Message(csound, "FIXME: instance unexpected arg: %d\n",
+          csound->Message(csound, Str("FIXME: instance unexpected arg: %d\n"),
                           arg->type);
         }
       }
